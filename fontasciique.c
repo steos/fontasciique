@@ -2,8 +2,9 @@
 #include <bitmap.h>
 
 #include <stdio.h>
-#include <ctype.h>
 #include <assert.h>
+#include <locale.h>
+#include <wchar.h>
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -121,9 +122,16 @@ int main(int argc, char **argv) {
   render.y = -1 * (face->descender / 64);
 
   char pixel = 'O';
-  char *str = args.text;
-  for (;*str != '\0';++str) {
-    if (*str == '\n') {
+  setlocale(LC_ALL, "");
+  int max = strlen(args.text);
+  wchar_t *text = malloc(max * sizeof(wchar_t));
+  mbstate_t ps;
+  const char *ptext = args.text;
+  memset(&ps, 0, sizeof(ps));
+  mbsrtowcs(text, &ptext, max, &ps);
+
+  for (wchar_t *c = text; *c != '\0'; ++c) {
+    if (*c == '\n') {
       bitmap_dump_ascii(&bm, pixel);
       puts("\n");
       bitmap_clear(&bm);
@@ -131,18 +139,16 @@ int main(int argc, char **argv) {
       render.y = -1 * (face->descender / 64);
       continue;
     }
-    FT_UInt index = FT_Get_Char_Index(face, *str);
+    FT_UInt index = FT_Get_Char_Index(face, *c);
     if (index == 0) {
-      fprintf(stderr, "no glyph found for '%c'\n", *str);
+      fprintf(stderr, "no glyph found for '%lc'\n", *c);
     }
     if (FT_Load_Glyph(face, index, FT_LOAD_DEFAULT)) {
-      fprintf(stderr, "no glyph for '%c' at index %d\n", *str, index);
+      fprintf(stderr, "no glyph for '%lc' at index %d\n", *c, index);
       continue;
     }
-    if (!isblank(*str)) {
-      render.x -= (face->glyph->metrics.horiBearingX) / 64;
-      FT_Outline_Render(ft, &face->glyph->outline, &ft_raster);
-    }
+    render.x -= (face->glyph->metrics.horiBearingX) / 64;
+    FT_Outline_Render(ft, &face->glyph->outline, &ft_raster);
     render.x += face->glyph->metrics.horiAdvance / 64;
   }
   bitmap_dump_ascii(&bm, pixel);
