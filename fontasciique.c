@@ -38,17 +38,18 @@ bool process_args(args_t *args, int argc, char **argv) {
     magot_print_help(stdout, optc, opts, parser.style);
     return true;
   }
-  magot_err_t err;
-  bool success = magot_parse(optc, opts, &parser, &err);
-  if (success) {
-    args->size = atoi(size.value);
-    args->font = font.value;
-    args->text = text.value;
-    args->anti_alias = magot_isset(&aa);
-    return true;
+
+  if (!magot_parse(optc, opts, &parser)) {
+    fputs("Usage error: ", stderr);
+    magot_print_error(stderr, &parser);
+    return false;
   }
-  printf("Usage error, %s: %s\n", magot_errstr(&err), err.arg);
-  return false;
+
+  args->size = atoi(size.value);
+  args->font = font.value;
+  args->text = text.value;
+  args->anti_alias = magot_isset(&aa);
+  return true;
 }
 
 bool init_ft(FT_Library *ft, FT_Face *face, char *font, int size) {
