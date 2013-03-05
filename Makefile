@@ -13,7 +13,7 @@ clean:
 
 bitmap.o: bitmap.h
 
-fontasciique: fontasciique.o bitmap.o
+fontasciique: fontasciique.o bitmap.o -lm
 	$(LINK.c) $(OUTPUT_OPTION) $^ \
 		-Wl,-Bstatic -lmagot -Wl,-Bdynamic $(FT_LDFLAGS)
 

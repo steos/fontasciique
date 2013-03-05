@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <locale.h>
 #include <wchar.h>
+#include <math.h>
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -80,7 +81,7 @@ typedef struct {
 
 void renderfn(int y, int count, const FT_Span *spans, void *user) {
   render_t *render = (render_t*)user;
-  int row = y + render->y;
+  int row = render->y - y;
   assert(row >= 0 && "horiBearingY fail");
   for (int i = 0; i < count; ++i) {
     const FT_Span span = spans[i];
@@ -90,6 +91,10 @@ void renderfn(int y, int count, const FT_Span *spans, void *user) {
       bitmap_setx(render->bitmap, x, row, span.coverage);
     }
   }
+}
+
+double scale(FT_Face face, int value, double pixel_size) {
+  return value * pixel_size / face->units_per_EM;
 }
 
 int main(int argc, char **argv) {
@@ -117,42 +122,50 @@ int main(int argc, char **argv) {
   ft_raster.gray_spans = renderfn;
   ft_raster.user = &render;
 
-  bitmap_init(&bm, face->height / 64, 100);
+  const int ybase = scale(face, face->ascender, args.size);
+  double height = scale(face, face->height, args.size);
+  double bbox_ydelta = scale(face, (face->bbox.yMax - face->bbox.yMin), args.size);
+
+  // the height is basically a best guess only, let's hope it fits
+  bitmap_init(&bm, 100, 1 + ceil(height > bbox_ydelta ? height : bbox_ydelta));
   render.bitmap = &bm;
   render.x = 0;
-  render.y = -1 * (face->descender / 64);
+  render.y = ybase;
 
   char pixel = 'O';
   setlocale(LC_ALL, "");
   int max = strlen(args.text);
-  wchar_t *text = malloc(max * sizeof(wchar_t));
+  wchar_t *text = calloc(max, sizeof(wchar_t));
   mbstate_t ps;
   const char *ptext = args.text;
   memset(&ps, 0, sizeof(ps));
   mbsrtowcs(text, &ptext, max, &ps);
 
+  const uint8_t threshold = 60;
   for (wchar_t *c = text; *c != '\0'; ++c) {
     if (*c == '\n') {
-      bitmap_dump_ascii(&bm, pixel);
-      puts("\n");
+      bitmap_dump_ascii(&bm, pixel, threshold);
       bitmap_clear(&bm);
       render.x = 0;
-      render.y = -1 * (face->descender / 64);
+      render.y = ybase;
       continue;
     }
     FT_UInt index = FT_Get_Char_Index(face, *c);
     if (index == 0) {
       fprintf(stderr, "no glyph found for '%lc'\n", *c);
     }
-    if (FT_Load_Glyph(face, index, FT_LOAD_DEFAULT)) {
+    if (FT_Load_Glyph(face, index, FT_LOAD_DEFAULT | FT_LOAD_NO_HINTING | FT_LOAD_NO_AUTOHINT)) {
       fprintf(stderr, "no glyph for '%lc' at index %d\n", *c, index);
       continue;
     }
-    render.x -= (face->glyph->metrics.horiBearingX) / 64;
+    double bx = face->glyph->metrics.horiBearingX / 64.0;
+
+    render.x += ceil(bx > 0 ? bx : -bx);
+
     FT_Outline_Render(ft, &face->glyph->outline, &ft_raster);
-    render.x += face->glyph->metrics.horiAdvance / 64;
+    render.x += (face->glyph->metrics.horiAdvance - bx) / 64.0;
   }
-  bitmap_dump_ascii(&bm, pixel);
+  bitmap_dump_ascii(&bm, pixel, threshold);
   bitmap_free(&bm);
 
   return 0;

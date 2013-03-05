@@ -80,13 +80,13 @@ void bitmap_clear(bitmap_t *bm) {
   memset(bm->pixels, 0, bm->wmax * bm->hmax);
 }
 
-void bitmap_dump_ascii(bitmap_t *bm, char c) {
+void bitmap_dump_ascii(bitmap_t *bm, char c, uint8_t threshold) {
   assert(bm != NULL && "null pointer");
   char s[] = {c,c,'\0'};
-  for (int y = bm->height - 1; y >= 0; --y) {
+  for (int y = 0; y < bm->height; ++y) {
     for (int x = 0; x < bm->width; ++x) {
       uint8_t val = bitmap_get(bm, x, y);
-      fputs(val > 0 ? s : "  ", stdout);
+      fputs(val > threshold ? s : "  ", stdout);
     }
     fputs("\n", stdout);
   }

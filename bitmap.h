@@ -24,6 +24,6 @@ void bitmap_clear(bitmap_t *bm);
 
 void bitmap_free(bitmap_t *bm);
 
-void bitmap_dump_ascii(bitmap_t *bm, char c);
+void bitmap_dump_ascii(bitmap_t *bm, char c, uint8_t threshold);
 
 #endif /* BITMAP_H */
